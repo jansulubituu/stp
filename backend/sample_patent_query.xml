@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE patent-document PUBLIC "-//EPO//DTD PATENT DOCUMENT 1.4//EN" "ep-patent-document-v1-4.dtd">
+<patent-document id="EP1225393A2" file="EP02001001NWA2.xml" lang="en" country="EP" doc-number="1225393" kind="A2" date-publ="20020724" status="n" dtd-version="ep-patent-document-v1-4">
+  <SDOBI lang="en">
+    <B100>
+      <B110>1225393</B110>
+      <B120>
+        <B121>EUROPEAN PATENT APPLICATION</B121>
+      </B120>
+      <B130>A2</B130>
+      <B140>
+        <date>20020724</date>
+      </B140>
+    </B100>
+    <B500>
+      <B510>
+        <B511>F24C 15/10</B511>
+        <B512>F24C 3/08</B512>
+      </B510>
+      <B540>
+        <B541>de</B541>
+        <B542>Gasherd mit einer flachen Heizfläche</B542>
+        <B541>en</B541>
+        <B542>Novel flat heating surface type gas stove</B542>
+      </B540>
+    </B500>
+  </SDOBI>
+  <abstract lang="en">
+    <p id="pa01" num="0001">There is disclosed a novel flat heating surface type gas stove which is capable of heating a heating substance across a heat resistance glass at practically applicable heating efficiency, overcoming any inconvenience resulting from the exposure of flame and facilitating the cleaning of the gas stove.</p>
+  </abstract>
+  <claims lang="en">
+    <claim id="c-en-0001" num="0001">
+      <claim-text>A gas stove comprises a heat resistance glass top plate which is disposed over a burner, wherein a gas-permeable porous body is disposed below said top plate, and a space between said top plate and a surface of said gas-permeable porous body is assigned to a combustion space.</claim-text>
+    </claim>
+    <claim id="c-en-0002" num="0002">
+      <claim-text>The gas stove according to claim 1, wherein combustion gas generated is designed to be discharged through said gas-permeable porous body. As high-temperature combustion gas passes through said gas-permeable porous body, radiant heat is generated from the surface of said gas-permeable porous body.</claim-text>
+    </claim>
+  </claims>
+</patent-document>
