@@ -15,6 +15,7 @@ class AnalysisRecord(Base):
     key_points: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     analysis: Mapped[str] = mapped_column(Text, nullable=False)
     suggestions: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    agent_trace: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

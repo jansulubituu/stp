@@ -1,3 +1,28 @@
+export type AgentStep = {
+  agent: string;
+  label: string;
+  status: "pending" | "running" | "completed" | "failed";
+  summary: string;
+  details: Record<string, unknown>;
+};
+
+export type AgentTrace = {
+  variant: string;
+  steps: AgentStep[];
+  metrics: Record<string, unknown>;
+};
+
+export type AnalysisRunResponse = {
+  run_id: string;
+  status: string;
+};
+
+export type AnalysisStageEvent = {
+  agent: string;
+  status: AgentStep["status"];
+  trace?: AgentTrace | null;
+};
+
 export type AnalysisRecord = {
   id: number;
   query: string;
@@ -6,6 +31,7 @@ export type AnalysisRecord = {
   analysis: string;
   suggestions: string[];
   created_at: string;
+  agent_trace?: AgentTrace | null;
 };
 
 export type SearchCandidate = {
@@ -27,4 +53,5 @@ export type SearchCandidate = {
 
 export type SearchResponse = {
   candidates: SearchCandidate[];
+  agent_trace?: AgentTrace | null;
 };

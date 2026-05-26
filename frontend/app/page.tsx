@@ -4,18 +4,65 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Bot, History, Menu, Plus, Send, Trash2, User, Sparkles, X, CheckSquare, Square, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp, Lightbulb, BookOpen, Scale, FileText, Eye } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
-import { searchCandidates, analyzeSelectedQuery, deleteHistoryItem, fetchHistory } from "@/lib/api";
-import type { AnalysisRecord, SearchCandidate } from "@/lib/types";
+import AgentTracePanel from "@/components/agent/AgentTracePanel";
+import LiveAgentProgress, { type LiveAgentStatus } from "@/components/agent/LiveAgentProgress";
+import SearchAgentProgress from "@/components/agent/SearchAgentProgress";
+import { analysisEventsUrl, searchCandidates, startSelectedAnalysis, deleteHistoryItem, fetchHistory } from "@/lib/api";
+import type { AgentTrace, AnalysisRecord, AnalysisStageEvent, SearchCandidate } from "@/lib/types";
 
 type ChatMessage =
-  | { role: "user"; content: string }
-  | { role: "assistant"; record: AnalysisRecord };
+  | { role: "user"; content: string; timestamp?: string }
+  | { role: "assistant"; record: AnalysisRecord; timestamp?: string };
 
 const examples = [
   "Đánh giá tính mới (novelty) của giải pháp nhận diện cử chỉ dựa trên đồ thị xương",
   "So sánh phạm vi bảo hộ (claim scope) các sáng chế về xử lý ngôn ngữ lớn của OpenAI và Google",
   "Phân tích khả năng bảo hộ sáng chế (patentability) của công nghệ tối ưu sạc pin xe điện bằng AI",
 ];
+
+function newLiveStatuses(): Record<string, LiveAgentStatus> {
+  return {
+    query_understanding: "pending",
+    retrieval: "pending",
+    evidence_extraction: "pending",
+    prior_art_analysis: "pending",
+    coverage_check: "pending",
+  };
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function parseBackendDate(dateStr: string): Date {
+  if (!dateStr) return new Date();
+  const hasTimezone = dateStr.endsWith("Z") || dateStr.includes("+") || (dateStr.includes("T") && dateStr.split("T")[1].includes("-"));
+  return new Date(hasTimezone ? dateStr : dateStr + "Z");
+}
+
+function groupHistory(records: AnalysisRecord[]) {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfWeek.getDate() - 7);
+  const groups = [
+    { label: "Hôm nay", records: [] as AnalysisRecord[] },
+    { label: "Hôm qua", records: [] as AnalysisRecord[] },
+    { label: "Tuần này", records: [] as AnalysisRecord[] },
+    { label: "Cũ hơn", records: [] as AnalysisRecord[] },
+  ];
+
+  records.forEach((record) => {
+    const createdAt = parseBackendDate(record.created_at);
+    if (createdAt >= startOfToday) groups[0].records.push(record);
+    else if (createdAt >= startOfYesterday) groups[1].records.push(record);
+    else if (createdAt >= startOfWeek) groups[2].records.push(record);
+    else groups[3].records.push(record);
+  });
+  return groups.filter((group) => group.records.length > 0);
+}
 
 /** Tạo tiêu đề sạch từ query */
 function cleanQueryTitle(raw: string): string {
@@ -283,6 +330,9 @@ export default function Home() {
   const [workflowStep, setWorkflowStep] = useState<"input" | "searching" | "selecting" | "analyzing" | "result">("input");
   const [currentQueryText, setCurrentQueryText] = useState("");
   const [searchResults, setSearchResults] = useState<SearchCandidate[]>([]);
+  const [searchTrace, setSearchTrace] = useState<AgentTrace | null>(null);
+  const [liveTrace, setLiveTrace] = useState<AgentTrace | null>(null);
+  const [liveStatuses, setLiveStatuses] = useState<Record<string, LiveAgentStatus>>(newLiveStatuses);
   const [selectedDocs, setSelectedDocs] = useState<SearchCandidate[]>([]);
   const [viewingDoc, setViewingDoc] = useState<SearchCandidate | null>(null);
   const [activeTab, setActiveTab] = useState<"abstract" | "claims" | "description" | "citations">("abstract");
@@ -294,7 +344,9 @@ export default function Home() {
   const [composerExpanded, setComposerExpanded] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeHistoryId, setActiveHistoryId] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const hasMessages = messages.length > 0;
 
@@ -307,6 +359,8 @@ export default function Home() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, workflowStep]);
+
+  useEffect(() => () => eventSourceRef.current?.close(), []);
 
   const activeTitle = useMemo(() => {
     const firstUserMessage = messages.find((message) => message.role === "user");
@@ -326,13 +380,18 @@ export default function Home() {
     }
 
     setError(null);
+    setSearchTrace(null);
+    setLiveTrace(null);
+    setActiveHistoryId(null);
+    setLiveStatuses(newLiveStatuses());
     setWorkflowStep("searching");
     setCurrentQueryText(trimmed);
-    setMessages((current) => [...current, { role: "user", content: trimmed }]);
+    setMessages((current) => [...current, { role: "user", content: trimmed, timestamp: new Date().toISOString() }]);
     
     try {
-      const res = await searchCandidates(trimmed);
+      const [res] = await Promise.all([searchCandidates(trimmed), wait(2000)]);
       setSearchResults(res.candidates || []);
+      setSearchTrace(res.agent_trace ?? null);
       setWorkflowStep("selecting");
       setSelectedDocs([]);
       setCurrentPage(1);
@@ -346,22 +405,64 @@ export default function Home() {
     }
   }
 
-  async function handleAnalyzeSelected() {
-    if (selectedDocs.length === 0) return;
-    
+  async function handleAnalyzeSelectedLive(documents: SearchCandidate[] = selectedDocs) {
+    if (documents.length === 0) return;
+
+    eventSourceRef.current?.close();
+    setSelectedDocs(documents);
     setWorkflowStep("analyzing");
     setError(null);
-    
+    setLiveTrace(null);
+    setLiveStatuses({ ...newLiveStatuses(), query_understanding: "running" });
+
     try {
-      const result = await analyzeSelectedQuery(currentQueryText, selectedDocs);
-      setMessages((current) => [...current, { role: "assistant", record: result }]);
-      setHistory((current) => [result, ...current.filter((item) => item.id !== result.id)]);
-      setWorkflowStep("result");
-      // Giữ lại searchResults và selectedDocs để có thể "Quay lại" và chọn tiếp doc khác
+      const run = await startSelectedAnalysis(currentQueryText, documents);
+      const source = new EventSource(analysisEventsUrl(run.run_id));
+      eventSourceRef.current = source;
+
+      source.addEventListener("stage", (event) => {
+        const update = JSON.parse((event as MessageEvent<string>).data) as AnalysisStageEvent;
+        if (update.trace) setLiveTrace(update.trace);
+        if (update.agent === "pipeline" && update.status === "failed") {
+          setError("Phân tích multi-agent thất bại. Vui lòng kiểm tra backend.");
+          source.close();
+          eventSourceRef.current = null;
+          setWorkflowStep("selecting");
+          return;
+        }
+        setLiveStatuses((current) => ({ ...current, [update.agent]: update.status }));
+      });
+
+      source.addEventListener("result", (event) => {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as { record: AnalysisRecord };
+        const result = payload.record;
+        setLiveTrace(result.agent_trace ?? null);
+        setMessages((current) => [...current, { role: "assistant", record: result, timestamp: new Date().toISOString() }]);
+        setHistory((current) => [result, ...current.filter((item) => item.id !== result.id)]);
+        setActiveHistoryId(result.id);
+        setWorkflowStep("result");
+        source.close();
+        eventSourceRef.current = null;
+      });
+
+      source.addEventListener("error", (event) => {
+        if (source.readyState === EventSource.CLOSED) return;
+        const data = (event as MessageEvent<string>).data;
+        const message = data ? (JSON.parse(data) as { message?: string }).message : "";
+        setError(message || "Mất kết nối tiến trình phân tích.");
+        source.close();
+        eventSourceRef.current = null;
+        setWorkflowStep("selecting");
+      });
     } catch {
-      setError("Phân tích AI thất bại. Vui lòng thử lại.");
+      setError("Không thể khởi tạo phiên phân tích multi-agent.");
       setWorkflowStep("selecting");
     }
+  }
+
+  function handleAnalyzeAutomatically() {
+    const topCandidates = searchResults.slice(0, 3);
+    void handleAnalyzeSelectedLive(topCandidates);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -371,11 +472,14 @@ export default function Home() {
 
   function openHistory(record: AnalysisRecord) {
     setMessages([
-      { role: "user", content: record.query },
-      { role: "assistant", record },
+      { role: "user", content: record.query, timestamp: record.created_at },
+      { role: "assistant", record, timestamp: record.created_at },
     ]);
     setError(null);
+    setSearchTrace(null);
+    setLiveTrace(null);
     setSidebarOpen(false);
+    setActiveHistoryId(record.id);
     setWorkflowStep("result");
   }
 
@@ -383,6 +487,7 @@ export default function Home() {
     try {
       await deleteHistoryItem(recordId);
       setHistory((current) => current.filter((item) => item.id !== recordId));
+      if (activeHistoryId === recordId) setActiveHistoryId(null);
     } catch {
       setError("Không xóa được mục lịch sử.");
     }
@@ -394,6 +499,7 @@ export default function Home() {
     const start = (currentPage - 1) * itemsPerPage;
     return searchResults.slice(start, start + itemsPerPage);
   }, [searchResults, currentPage, itemsPerPage]);
+  const historyGroups = useMemo(() => groupHistory(history), [history]);
 
   const toggleSelection = (candidate: SearchCandidate) => {
     const isSelected = selectedDocs.some(c => c.id === candidate.id);
@@ -423,21 +529,26 @@ export default function Home() {
             <X size={18} />
           </button>
         </div>
-        <button className="newButton" onClick={() => { setMessages([]); setWorkflowStep("input"); setSidebarOpen(false); }}>
+        <button className="newButton" onClick={() => { eventSourceRef.current?.close(); setMessages([]); setSearchTrace(null); setLiveTrace(null); setActiveHistoryId(null); setWorkflowStep("input"); setSidebarOpen(false); }}>
           <Plus size={16} /> Tra cứu mới
         </button>
         <div className="historyHeader"><History size={14} /><span>Lịch sử nghiên cứu</span></div>
         <div className="historyList">
-          {history.map((item) => (
-            <div className="historyItem" key={item.id}>
-              <button onClick={() => openHistory(item)}>
-                <span>{cleanQueryTitle(item.query)}</span>
-                <small>{new Date(item.created_at).toLocaleDateString("vi-VN")} {new Date(item.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</small>
-              </button>
-              <button className="iconButton" onClick={() => void removeHistory(item.id)}>
-                <Trash2 size={14} />
-              </button>
-            </div>
+          {historyGroups.map((group) => (
+            <section className="historyGroup" key={group.label}>
+              <h3>{group.label}</h3>
+              {group.records.map((item) => (
+                <div className={`historyItem ${activeHistoryId === item.id ? "historyItemActive" : ""}`} key={item.id}>
+                  <button title={cleanQueryTitle(item.query)} onClick={() => openHistory(item)}>
+                    <span>{cleanQueryTitle(item.query)}</span>
+                    <small>{parseBackendDate(item.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</small>
+                  </button>
+                  <button aria-label="Xóa phiên" className="iconButton" onClick={() => void removeHistory(item.id)}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </section>
           ))}
         </div>
       </aside>
@@ -513,6 +624,7 @@ export default function Home() {
                       </button>
                     </div>
                   )}
+                  <AgentTracePanel trace={message.record.agent_trace} />
                   <div className="markdown-body"><ReactMarkdown>{message.record.analysis}</ReactMarkdown></div>
                 </div>
               </article>
@@ -520,12 +632,9 @@ export default function Home() {
           )}
 
           {workflowStep === "searching" && (
-            <article className="message assistantMessage">
+            <article className="message assistantMessage" style={{ maxWidth: "900px" }}>
               <div className="avatar"><Search size={16} /></div>
-              <div className="thinkingContainer">
-                <span className="thinkingText">Đang tìm kiếm...</span>
-                <div className="dotGroup"><div className="dot" /><div className="dot" /><div className="dot" /></div>
-              </div>
+              <SearchAgentProgress query={currentQueryText} />
             </article>
           )}
 
@@ -533,6 +642,18 @@ export default function Home() {
             <article className="message assistantMessage" style={{ maxWidth: "100%" }}>
               <div className="avatar"><Bot size={16} /></div>
               <div className="selectionContainer" style={{ width: "100%" }}>
+                <AgentTracePanel trace={searchTrace} compact />
+                {searchResults.length > 0 && (
+                  <div className="autoAnalysisPrompt">
+                    <div>
+                      <strong>Để hệ thống tự phân tích tài liệu phù hợp nhất?</strong>
+                      <p>Agent sẽ tự chọn {Math.min(searchResults.length, 3)} tài liệu có điểm tương đồng cao nhất và chạy đánh giá chuyên sâu theo thời gian thực.</p>
+                    </div>
+                    <button type="button" onClick={handleAnalyzeAutomatically}>
+                      <Sparkles size={16} /> Tự động phân tích
+                    </button>
+                  </div>
+                )}
                 <h3 style={{ margin: "0 0 16px 0", color: "var(--text)" }}>Vui lòng chọn các tài liệu muốn phân tích sâu (Tối đa 5)</h3>
                 
                 <div className="tableControls" style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", alignItems: "center" }}>
@@ -570,53 +691,52 @@ export default function Home() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedResults.map((c) => {
-                        const isSelected = selectedDocs.some(doc => doc.id === c.id);
-                        const disabled = !isSelected && selectedDocs.length >= 5;
-                        return (
-                          <tr key={c.id} 
-                              onClick={(e) => {
-                                // Nếu click vào cột chứa button thì bỏ qua
-                                if ((e.target as HTMLElement).closest('.view-btn')) return;
-                                if (!disabled) toggleSelection(c);
-                              }}
-                              style={{ 
-                                borderBottom: "1px solid var(--border)", 
-                                cursor: disabled ? "not-allowed" : "pointer",
-                                opacity: disabled ? 0.5 : 1,
-                                background: isSelected ? "rgba(79, 70, 229, 0.05)" : "transparent",
-                                transition: "background 0.2s"
-                              }}>
-                            <td style={{ padding: "12px" }}>
-                              {isSelected ? <CheckSquare size={18} color="var(--accent-start)" /> : <Square size={18} color="var(--muted)" />}
-                            </td>
-                            <td style={{ padding: "12px", color: "var(--accent-start)" }}>{c.id}</td>
-                            <td style={{ padding: "12px", color: "var(--text)" }}>
-                              <div style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                                {renderPatentTitles(c)}
-                              </div>
-                            </td>
-                            <td style={{ padding: "12px", color: "var(--muted)" }}>
-                              <div style={{ maxWidth: "180px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={formatPartyNames(c.assignees)}>
-                                {formatPartyNames(c.assignees)}
-                              </div>
-                            </td>
-                            <td style={{ padding: "12px", color: "var(--muted)" }}>
-                              {c.publication_date && c.publication_date !== "N/A" ? c.publication_date.substring(0, 4) : "N/A"}
-                            </td>
-                            <td style={{ padding: "12px", textAlign: "right" }} className="view-btn">
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); setViewingDoc(c); setActiveTab("abstract"); }}
-                                style={{ background: "var(--sidebar)", border: "1px solid var(--border)", color: "var(--text)", padding: "4px 10px", borderRadius: "6px", fontSize: "12px", fontWeight: "500", cursor: "pointer", transition: "all 0.2s" }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--panel)"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = "var(--sidebar)"; }}
-                              >
-                                Xem
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {paginatedResults.map((candidate) => {
+                    const isSelected = selectedDocs.some((document) => document.id === candidate.id);
+                    const disabled = !isSelected && selectedDocs.length >= 5;
+                    return (
+                      <tr
+                        key={candidate.id}
+                        onClick={(event) => {
+                          if ((event.target as HTMLElement).closest(".view-btn")) return;
+                          if (!disabled) toggleSelection(candidate);
+                        }}
+                        style={{
+                          borderBottom: "1px solid var(--border)",
+                          cursor: disabled ? "not-allowed" : "pointer",
+                          opacity: disabled ? 0.5 : 1,
+                          background: isSelected ? "rgba(79, 70, 229, 0.05)" : "transparent",
+                          transition: "background 0.2s",
+                        }}
+                      >
+                        <td style={{ padding: "12px" }}>
+                          {isSelected ? <CheckSquare size={18} color="var(--accent-start)" /> : <Square size={18} color="var(--muted)" />}
+                        </td>
+                        <td style={{ padding: "12px", color: "var(--accent-start)" }}>{candidate.id}</td>
+                        <td style={{ padding: "12px", color: "var(--text)" }}>
+                          <div style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            {renderPatentTitles(candidate)}
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px", color: "var(--muted)" }}>
+                          <div style={{ maxWidth: "180px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={formatPartyNames(candidate.assignees)}>
+                            {formatPartyNames(candidate.assignees)}
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px", color: "var(--muted)" }}>
+                          {candidate.publication_date && candidate.publication_date !== "N/A" ? candidate.publication_date.substring(0, 4) : "N/A"}
+                        </td>
+                        <td style={{ padding: "12px", textAlign: "right" }} className="view-btn">
+                          <button
+                            onClick={(event) => { event.stopPropagation(); setViewingDoc(candidate); setActiveTab("abstract"); }}
+                            style={{ background: "var(--sidebar)", border: "1px solid var(--border)", color: "var(--text)", padding: "4px 10px", borderRadius: "6px", fontSize: "12px", fontWeight: "500", cursor: "pointer", transition: "all 0.2s" }}
+                          >
+                            Xem
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                     </tbody>
                   </table>
                 </div>
@@ -624,7 +744,7 @@ export default function Home() {
                 <div className="selectionActions" style={{ marginTop: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ color: "var(--text)", fontSize: "14px", fontWeight: "500" }}>Đã chọn: <strong style={{ color: "var(--accent-start)" }}>{selectedDocs.length}/5</strong> tài liệu</div>
                   <button 
-                    onClick={handleAnalyzeSelected}
+                    onClick={() => void handleAnalyzeSelectedLive()}
                     disabled={selectedDocs.length === 0}
                     style={{ background: selectedDocs.length > 0 ? "var(--accent-gradient)" : "#e2e8f0", color: selectedDocs.length > 0 ? "#fff" : "var(--muted)", padding: "10px 24px", borderRadius: "8px", fontWeight: "600", transition: "all 0.2s", cursor: selectedDocs.length > 0 ? "pointer" : "not-allowed", boxShadow: selectedDocs.length > 0 ? "var(--glow)" : "none" }}
                   >
@@ -636,9 +756,10 @@ export default function Home() {
           )}
 
           {workflowStep === "analyzing" && (
-            <article className="message assistantMessage">
+            <article className="message assistantMessage" style={{ maxWidth: "900px" }}>
               <div className="avatar"><Bot size={16} /></div>
-              <div className="thinkingContainer">
+              <LiveAgentProgress statuses={liveStatuses} trace={liveTrace} selectedCount={selectedDocs.length} />
+              <div className="thinkingContainer legacyAnalysisLoading">
                 <span className="thinkingText">Multi-agent AI đang đọc kỹ {selectedDocs.length} tài liệu và sinh báo cáo...</span>
                 <div className="dotGroup"><div className="dot" /><div className="dot" /><div className="dot" /></div>
               </div>
@@ -804,69 +925,82 @@ export default function Home() {
 
         {/* Floating Composer */}
         {(workflowStep === "input" || workflowStep === "result") && (
-          <div className="composer">
-            <div className="composerHeader" style={{ alignItems: "center" }}>
-              <button type="button" onClick={() => setInputMode("form")} className={inputMode === "form" ? "active" : ""}>Nhập theo trường</button>
-              <button type="button" onClick={() => setInputMode("text")} className={inputMode === "text" ? "active" : ""}>Mô tả ý tưởng sáng chế</button>
-              
-              <button 
-                type="button" 
-                onClick={() => setComposerExpanded(!composerExpanded)} 
-                style={{ 
-                  marginLeft: "auto", 
-                  background: "rgba(255,255,255,0.05)", 
-                  border: "1px solid var(--border)",
-                  color: "var(--muted)", 
-                  display: "flex", 
-                  alignItems: "center", 
-                  gap: "6px",
-                  fontSize: "12px",
-                  padding: "6px 12px",
-                  borderRadius: "20px",
-                  cursor: "pointer",
-                  transition: "all 0.2s"
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--muted)"; e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
-              >
-                {composerExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                {composerExpanded ? "Thu gọn bộ gõ" : "Mở rộng bộ gõ"}
-              </button>
-            </div>
-            {composerExpanded && (
-              <form className={`composerForm ${inputMode === "form" ? "formMode" : ""}`} onSubmit={handleSubmit}>
-                {inputMode === "text" ? (
-                  <textarea
-                    onChange={(event) => setQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        void handleSearch();
-                      }
-                    }}
-                    placeholder="Nhập mô tả ý tưởng sáng chế..."
-                    rows={1}
-                    value={query}
-                  />
-                ) : (
-                  <div className="structuredForm">
-                    <input type="text" placeholder="Tiêu đề (Title) *" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required />
-                    <textarea placeholder="Tóm tắt (Abstract) - tóm lược nội dung" value={formData.abstract} onChange={e => setFormData({...formData, abstract: e.target.value})} rows={2} />
-                    <textarea placeholder="Yêu cầu bảo hộ (Claims) - phạm vi độc quyền" value={formData.claims} onChange={e => setFormData({...formData, claims: e.target.value})} rows={3} />
-                    <textarea placeholder="Mô tả chi tiết (Description)" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows={2} />
-                    <input type="text" placeholder="Mã phân loại IPC (vd: A61K 31/00)" value={formData.ipc} onChange={e => setFormData({...formData, ipc: e.target.value})} />
+          <div className={`composer ${composerExpanded && inputMode === "form" ? "composerLarge" : ""}`}>
+            <div className="composerPanel">
+              <div className="composerHeader">
+                <div className="composerIdentity">
+                  <span><Sparkles size={16} /></span>
+                  <div>
+                    <strong>Tra cứu sáng chế bằng AI</strong>
+                    <small>Nhập thông tin để Agent tìm tài liệu đối chứng</small>
                   </div>
-                )}
-                
-                <button
-                  aria-label="Gửi yêu cầu"
-                  disabled={inputMode === "text" ? !query.trim() : !formData.title.trim()}
-                  type="submit"
-                >
-                  <Send size={18} />
+                </div>
+                <button className="composerToggle" type="button" onClick={() => setComposerExpanded(!composerExpanded)}>
+                  {composerExpanded ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
+                  {composerExpanded ? "Thu gọn" : "Mở nhập liệu"}
                 </button>
-              </form>
-            )}
+              </div>
+              {composerExpanded && (
+                <>
+                  <div className="composerModeSwitch" aria-label="Chế độ nhập">
+                    <button type="button" onClick={() => setInputMode("form")} className={inputMode === "form" ? "active" : ""}>
+                      <FileText size={15} /> Theo trường dữ liệu
+                    </button>
+                    <button type="button" onClick={() => setInputMode("text")} className={inputMode === "text" ? "active" : ""}>
+                      <Lightbulb size={15} /> Mô tả ý tưởng
+                    </button>
+                  </div>
+                  <form className={`composerForm ${inputMode === "form" ? "formMode" : "ideaMode"}`} onSubmit={handleSubmit}>
+                    {inputMode === "text" ? (
+                      <label className="composerField ideaField">
+                        <span>Ý tưởng hoặc bài toán kỹ thuật</span>
+                        <textarea
+                          onChange={(event) => setQuery(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" && !event.shiftKey) {
+                              event.preventDefault();
+                              void handleSearch();
+                            }
+                          }}
+                          placeholder="Ví dụ: Hệ thống mạng quang có hai trạm gốc tự chuyển đổi khi xảy ra lỗi..."
+                          rows={3}
+                          value={query}
+                        />
+                      </label>
+                    ) : (
+                      <div className="structuredForm">
+                        <label className="composerField composerFieldWide">
+                          <span>Tiêu đề sáng chế</span>
+                          <input type="text" placeholder="Nhập tên giải pháp kỹ thuật cần tra cứu" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                        </label>
+                        <label className="composerField">
+                          <span>Tóm tắt</span>
+                          <textarea placeholder="Mục tiêu và ý tưởng chính của giải pháp" value={formData.abstract} onChange={e => setFormData({...formData, abstract: e.target.value})} rows={2} />
+                        </label>
+                        <label className="composerField">
+                          <span>Yêu cầu bảo hộ</span>
+                          <textarea placeholder="Các yếu tố kỹ thuật cần bảo vệ" value={formData.claims} onChange={e => setFormData({...formData, claims: e.target.value})} rows={2} />
+                        </label>
+                        <label className="composerField">
+                          <span>Mô tả chi tiết</span>
+                          <textarea placeholder="Cấu tạo, hoạt động hoặc phương án triển khai" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows={2} />
+                        </label>
+                      </div>
+                    )}
+                    <footer className="composerFooter">
+                      <span>{inputMode === "form" ? "" : "Nhấn Enter để tìm, Shift + Enter để xuống dòng."}</span>
+                      <button
+                        className="composerSubmit"
+                        disabled={inputMode === "text" ? !query.trim() : (!formData.title.trim() && !formData.abstract.trim() && !formData.claims.trim() && !formData.description.trim())}
+                        type="submit"
+                      >
+                        Tìm tài liệu <Send size={16} />
+                      </button>
+                    </footer>
+                  </form>
+                </>
+              )}
+            </div>
           </div>
         )}
       </section>

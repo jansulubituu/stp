@@ -206,7 +206,7 @@ MULTIAGENT_KNN_EMBED_API_KEY=EMPTY
 MULTIAGENT_KNN_EMBED_MODEL=jina-embed-safe
 ```
 
-Neu khong set `MULTIAGENT_KNN_EMBED_API_BASE`, pipeline se thu load local `jinaai/jina-embeddings-v3`, can them cac dependency GPU/Transformers nang hon.
+Neu da set `JINA_API_KEY` va khong set `MULTIAGENT_KNN_EMBED_API_BASE`, pipeline se tu dong goi Jina API voi model `jina-embeddings-v3`. Neu khong co ca hai cau hinh nay, pipeline se thu load local `jinaai/jina-embeddings-v3`, can them cac dependency GPU/Transformers nang hon.
 
 Không commit file `.env` có chứa API key.
 

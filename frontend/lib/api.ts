@@ -1,4 +1,4 @@
-import type { AnalysisRecord, SearchCandidate, SearchResponse } from "@/lib/types";
+import type { AnalysisRecord, AnalysisRunResponse, SearchCandidate, SearchResponse } from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -41,6 +41,17 @@ export function analyzeSelectedQuery(query: string, selected_candidates: SearchC
     method: "POST",
     body: JSON.stringify({ query, selected_candidates }),
   });
+}
+
+export function startSelectedAnalysis(query: string, selected_candidates: SearchCandidate[]): Promise<AnalysisRunResponse> {
+  return request<AnalysisRunResponse>("/api/analyze-selected/runs", {
+    method: "POST",
+    body: JSON.stringify({ query, selected_candidates }),
+  });
+}
+
+export function analysisEventsUrl(runId: string): string {
+  return `${API_BASE_URL}/api/analysis-runs/${runId}/events`;
 }
 
 export function fetchHistory(): Promise<AnalysisRecord[]> {

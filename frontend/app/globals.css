@@ -667,7 +667,7 @@ button:active {
 }
 
 /* ========================================
-   FLOATING COMPOSER - Acrylic White
+   INPUT COMPOSER
    ======================================== */
 .composer {
   position: absolute;
@@ -675,164 +675,1119 @@ button:active {
   left: 0;
   right: 0;
   padding: 24px;
-  background: linear-gradient(to top, var(--bg) 65%, transparent 100%);
+  background: linear-gradient(to top, var(--bg) 76%, rgba(248, 250, 252, 0.78) 88%, transparent 100%);
   pointer-events: none;
 }
 
-.composerForm {
-  max-width: 780px;
+.composerPanel {
+  position: relative;
+  overflow: hidden;
+  max-width: 900px;
   margin: 0 auto;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 6px;
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  box-shadow: var(--shadow-lg);
+  padding: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(79, 70, 229, 0.15);
+  background: rgba(255, 255, 255, 0.93);
+  backdrop-filter: blur(22px);
+  box-shadow: 0 22px 60px rgba(30, 41, 59, 0.14), 0 4px 18px rgba(79, 70, 229, 0.07);
   pointer-events: auto;
-  transition: all 0.3s;
 }
 
-.composerForm:focus-within {
-  border-color: var(--accent-start);
-  box-shadow: 0 20px 48px -12px rgba(79, 70, 229, 0.16), 0 0 0 1px rgba(79, 70, 229, 0.05);
-}
-
-.composerForm textarea {
-  flex: 1;
-  min-height: 40px;
-  max-height: 180px;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  font-size: 14.5px;
-  padding: 10px 12px;
-  outline: none;
-  resize: none;
-  line-height: 1.5;
-}
-
-.composerForm textarea::placeholder {
-  color: var(--dim);
-}
-
-.composerForm button {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--text); /* Dark premium button */
-  color: #fff;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-.composerForm button:hover:not(:disabled) {
-  background: #1e293b;
-  transform: translateY(-1px);
-}
-
-.composerForm button:disabled {
-  background: #f1f5f9;
-  color: #cbd5e1;
-  cursor: not-allowed;
+.composerPanel::before {
+  position: absolute;
+  content: "";
+  top: -64px;
+  right: -44px;
+  width: 190px;
+  height: 130px;
+  pointer-events: none;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.1);
+  filter: blur(30px);
 }
 
 .composerHeader {
-  max-width: 780px;
-  margin: 0 auto 8px auto;
+  position: relative;
   display: flex;
-  gap: 8px;
-  pointer-events: auto;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
 }
 
-.composerHeader button {
-  background: var(--panel);
+.composerIdentity {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+}
+
+.composerIdentity > span {
+  width: 39px;
+  height: 39px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #ffffff;
+  background: var(--accent-gradient);
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.23);
+}
+
+.composerIdentity strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.composerIdentity small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.composerToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 7px 12px;
+  background: #f8fafc;
   border: 1px solid var(--border);
   color: var(--muted);
-  padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
-  box-shadow: var(--shadow-sm);
   transition: all 0.2s;
 }
 
-.composerHeader button:hover {
-  background: #f8fafc;
-  border-color: var(--border-hover);
+.composerToggle:hover {
+  border-color: rgba(79, 70, 229, 0.24);
+  color: var(--accent-start);
+}
+
+.composerModeSwitch {
+  display: inline-flex;
+  gap: 4px;
+  margin: 14px 0 12px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f1f5f9;
+}
+
+.composerModeSwitch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 550;
+  transition: all 0.18s ease;
+}
+
+.composerModeSwitch button:hover {
   color: var(--text);
 }
 
-.composerHeader button.active {
-  background: #ffffff;
-  border-color: var(--accent-start);
+.composerModeSwitch button.active {
   color: var(--accent-start);
-  font-weight: 600;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+  background: #ffffff;
+  box-shadow: 0 2px 9px rgba(15, 23, 42, 0.08);
 }
 
-.composerForm.formMode {
+.composerForm {
+  display: flex;
   flex-direction: column;
-  align-items: stretch;
-  padding: 14px;
-}
-
-.composerForm.formMode button[type="submit"] {
-  align-self: flex-end;
-  margin-top: 8px;
-  width: auto;
-  padding: 0 20px;
-  border-radius: 8px;
-  background: var(--accent-gradient);
-  color: #fff;
-  box-shadow: var(--glow);
-}
-
-.composerForm.formMode button[type="submit"]:disabled {
-  background: #f1f5f9;
-  color: #cbd5e1;
-  box-shadow: none;
+  gap: 12px;
 }
 
 .structuredForm {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
   width: 100%;
 }
 
-.structuredForm input,
-.structuredForm textarea {
+.composerField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.composerFieldWide {
+  grid-column: 1 / -1;
+}
+
+.composerField span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.composerField span b {
+  padding: 2px 6px;
+  border-radius: 99px;
+  color: var(--accent-start);
+  background: rgba(79, 70, 229, 0.09);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.composerField input,
+.composerField textarea {
   width: 100%;
   background: #f8fafc;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   color: var(--text);
-  font-size: 14px;
-  padding: 10px 14px;
+  font-size: 13.5px;
+  padding: 10px 12px;
   outline: none;
   transition: all 0.2s;
   font-family: var(--font-sans);
+  line-height: 1.45;
 }
 
-.structuredForm textarea {
+.composerField textarea {
   resize: vertical;
   min-height: 44px;
 }
 
-.structuredForm input:focus,
-.structuredForm textarea:focus {
+.composerField input:focus,
+.composerField textarea:focus {
   border-color: var(--accent-start);
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.09);
 }
 
-.structuredForm input::placeholder,
-.structuredForm textarea::placeholder {
+.composerField input::placeholder,
+.composerField textarea::placeholder {
   color: var(--dim);
+}
+
+.ideaField textarea {
+  min-height: 92px;
+  resize: none;
+  padding: 13px 14px;
+  font-size: 14px;
+}
+
+.composerFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.composerFooter > span {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.composerSubmit {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 17px;
+  border-radius: 11px;
+  background: var(--accent-gradient);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  box-shadow: var(--glow);
+  transition: all 0.2s ease;
+}
+
+.composerSubmit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 13px 26px rgba(79, 70, 229, 0.27);
+}
+
+.composerSubmit:disabled {
+  color: #94a3b8;
+  background: #e2e8f0;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   MULTI-AGENT TRACE
+   ======================================== */
+.agentTrace {
+  margin: 0 0 24px;
+  padding: 18px;
+  border: 1px solid rgba(79, 70, 229, 0.16);
+  border-radius: var(--radius-md);
+  background: rgba(79, 70, 229, 0.025);
+}
+
+.agentTraceHeader {
+  margin-bottom: 14px;
+}
+
+.agentTraceHeader h3 {
+  margin: 0 0 4px;
+  color: var(--accent-start);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.agentTraceHeader p {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 0;
+}
+
+.agentSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agentStep {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.agentStepHeading {
+  display: grid;
+  grid-template-columns: 32px 1fr 20px;
+  gap: 10px;
+  align-items: start;
+}
+
+.agentStepIcon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-start);
+  border-radius: 8px;
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.agentStepHeading strong {
+  display: block;
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.agentStepHeading p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.agentStepDone {
+  margin-top: 5px;
+  color: #059669;
+}
+
+.agentDetailText {
+  font-size: 13px;
+  color: #334155;
+  margin: 10px 0 8px 42px;
+  line-height: 1.55;
+}
+
+.agentChipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0 42px;
+}
+
+.agentChipList span {
+  padding: 4px 8px;
+  color: var(--accent-start);
+  font-size: 12px;
+  border-radius: 12px;
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.agentDetailList {
+  margin: 10px 0 0 56px;
+  padding: 0;
+  color: #475569;
+  font-size: 12.5px;
+}
+
+.agentMetricRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0 42px;
+}
+
+.agentMetricRow span {
+  color: #475569;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.agentEvidenceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin: 16px 0 0 42px;
+}
+
+.agentEvidenceCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.agentEvidenceCard:hover {
+  box-shadow: var(--shadow);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.agentEvidenceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  list-style: none;
+  transition: background 0.2s;
+}
+.agentEvidenceHeader::-webkit-details-marker {
+  display: none;
+}
+.agentEvidenceHeader:hover {
+  background: #f1f5f9;
+}
+
+.agentEvidenceHeader strong {
+  font-size: 14.5px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.agentEvidenceBadge {
+  display: flex;
+  gap: 8px;
+}
+
+.badgeMatch {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badgeMatch::before {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #059669;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.agentEvidenceBody {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.agentEvidenceMatchItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border-left: 4px solid #10b981;
+  transition: all 0.2s ease;
+}
+.agentEvidenceMatchItem:hover {
+  background: #e0e7ff;
+  border-left-color: #6366f1;
+}
+
+.matchLabel {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.matchText {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.agentRiskGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 14px 0 0 42px;
+}
+
+.riskCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s;
+}
+
+.riskCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.riskCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--border);
+}
+
+.riskCardHeader strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.riskBadge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.02em;
+}
+
+.risk-high { border-left: 4px solid #ef4444; }
+.risk-high .riskBadge {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.risk-medium { border-left: 4px solid #f59e0b; }
+.risk-medium .riskBadge {
+  background: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.risk-low { border-left: 4px solid #10b981; }
+.risk-low .riskBadge {
+  background: rgba(16, 185, 129, 0.1);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.riskSynthesis {
+  padding: 16px;
+  background: #ffffff;
+}
+
+.riskSynthesis p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #475569;
+  position: relative;
+  padding-left: 14px;
+  border-left: 2px solid #cbd5e1;
+}
+
+.riskSynthesis strong {
+  color: #334155;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.agentTraceCompact .agentStep {
+  padding: 10px;
+}
+
+/* ========================================
+   SEARCH QUERY AGENT PROGRESS
+   ======================================== */
+.searchAgentProgress {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 850px);
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 20px;
+  color: var(--text);
+  background: linear-gradient(125deg, #ffffff, #f8faff 55%, #f5f7ff);
+  border: 1px solid rgba(79, 70, 229, 0.16);
+  box-shadow: var(--shadow), 0 9px 30px rgba(79, 70, 229, 0.05);
+}
+
+.searchAgentGlow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 4% 0%, rgba(79, 70, 229, 0.07), transparent 33%),
+    radial-gradient(circle at 88% 15%, rgba(8, 145, 178, 0.06), transparent 31%),
+    linear-gradient(90deg, transparent, rgba(79, 70, 229, 0.07), transparent);
+  background-size: auto, auto, 34% 100%;
+  background-repeat: no-repeat;
+  animation: searchAgentSweep 2s ease-in-out infinite;
+}
+
+.searchAgentProgress header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.searchAgentCore {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  border-radius: 15px;
+  color: var(--accent-start);
+  background: rgba(79, 70, 229, 0.08);
+  border: 1px solid rgba(79, 70, 229, 0.15);
+  box-shadow: 0 7px 18px rgba(79, 70, 229, 0.09);
+  animation: searchAgentCore 1.3s ease-in-out infinite;
+}
+
+.searchAgentProgress header span {
+  color: var(--accent-start);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+}
+
+.searchAgentProgress header h3 {
+  color: var(--text);
+  font-size: 17px;
+  margin: 4px 0;
+}
+
+.searchAgentProgress header p {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 0;
+}
+
+.searchPhaseRail {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.searchPhase {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 66px;
+  padding: 10px;
+  border-radius: 11px;
+  color: var(--dim);
+  border: 1px solid var(--border);
+  background: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.searchPhase strong,
+.searchPhase small {
+  display: block;
+}
+
+.searchPhase strong {
+  color: var(--text);
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.searchPhase small {
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.searchPhase-running {
+  color: var(--accent-start);
+  background: rgba(79, 70, 229, 0.05);
+  border-color: rgba(79, 70, 229, 0.3);
+}
+
+.searchPhase-running small {
+  color: var(--accent-start);
+}
+
+.searchPhase-running i {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-start);
+  box-shadow: 0 0 10px rgba(79, 70, 229, 0.42);
+  animation: agentSignal 0.8s ease-in-out infinite;
+}
+
+.searchPhase-completed {
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.18);
+  background: rgba(16, 185, 129, 0.045);
+}
+
+.searchPhase-completed strong {
+  color: var(--text);
+}
+
+.searchTermStream {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 15px;
+  padding-top: 13px;
+  border-top: 1px solid var(--border);
+}
+
+.searchTermStream span {
+  color: var(--muted);
+  font-size: 11.5px;
+  margin-right: 5px;
+}
+
+.searchTermStream b {
+  border: 1px solid rgba(79, 70, 229, 0.13);
+  border-radius: 14px;
+  padding: 4px 9px;
+  color: var(--accent-start);
+  font-size: 11.5px;
+  font-weight: 500;
+  background: rgba(79, 70, 229, 0.06);
+  animation: searchTermAppear 0.55s ease both;
+}
+
+.autoAnalysisPrompt {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin: 0 0 18px;
+  padding: 15px 17px;
+  border-radius: 13px;
+  border: 1px solid rgba(79, 70, 229, 0.2);
+  background: linear-gradient(110deg, rgba(79, 70, 229, 0.06), rgba(34, 211, 238, 0.045));
+}
+
+.autoAnalysisPrompt strong {
+  color: var(--text);
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.autoAnalysisPrompt p {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.48;
+  margin: 0;
+}
+
+.autoAnalysisPrompt button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  color: #fff;
+  font-weight: 600;
+  padding: 10px 15px;
+  border-radius: 9px;
+  background: var(--accent-gradient);
+  box-shadow: var(--glow);
+}
+
+.autoAnalysisPrompt button:hover {
+  transform: translateY(-1px);
+}
+
+@keyframes searchAgentSweep {
+  0%, 100% { background-position: 0 0, 0 0, -42% 0; }
+  50% { background-position: 0 0, 0 0, 126% 0; }
+}
+
+@keyframes searchAgentCore {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+@keyframes searchTermAppear {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========================================
+   LIVE MULTI-AGENT CONSOLE
+   ======================================== */
+.legacyAnalysisLoading {
+  display: none;
+}
+
+.liveAgentConsole {
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 22px;
+  padding: 22px;
+  color: var(--text);
+  background: linear-gradient(140deg, #ffffff 0%, #f8faff 50%, #f7fbfc 100%);
+  border: 1px solid rgba(79, 70, 229, 0.16);
+  box-shadow: var(--shadow), inset 0 0 40px rgba(79, 70, 229, 0.025);
+}
+
+.liveAgentBackdrop,
+.liveAgentBackdrop::before,
+.liveAgentBackdrop::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+  z-index: -1;
+}
+
+.liveAgentBackdrop {
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 15% 10%, rgba(79, 70, 229, 0.055), transparent 34%),
+    radial-gradient(circle at 80% 10%, rgba(8, 145, 178, 0.05), transparent 35%),
+    linear-gradient(rgba(79, 70, 229, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79, 70, 229, 0.035) 1px, transparent 1px);
+  background-size: auto, auto, 28px 28px, 28px 28px;
+  animation: agentGridDrift 12s linear infinite;
+}
+
+.liveAgentBackdrop::before {
+  width: 240px;
+  height: 240px;
+  top: -120px;
+  right: -60px;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.09);
+  filter: blur(56px);
+  animation: agentGlowFloat 4.6s ease-in-out infinite alternate;
+}
+
+.liveAgentBackdrop::after {
+  height: 2px;
+  left: 0;
+  right: 0;
+  top: 0;
+  background: linear-gradient(90deg, transparent, rgba(79, 70, 229, 0.45), rgba(8, 145, 178, 0.4), transparent);
+  box-shadow: 0 0 10px rgba(79, 70, 229, 0.14);
+  animation: agentScanner 3.8s ease-in-out infinite;
+}
+
+.liveAgentHeader {
+  display: grid;
+  grid-template-columns: 58px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.liveAgentOrb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  color: var(--accent-start);
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.1), rgba(79, 70, 229, 0.035));
+  border: 1px solid rgba(79, 70, 229, 0.19);
+  box-shadow: 0 7px 22px rgba(79, 70, 229, 0.09);
+  animation: agentOrbTurn 4s linear infinite;
+}
+
+.liveAgentOrb::after {
+  position: absolute;
+  content: "";
+  inset: -7px;
+  border-radius: inherit;
+  border: 1px dashed rgba(79, 70, 229, 0.19);
+}
+
+.liveAgentHeader span {
+  color: var(--accent-start);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+}
+
+.liveAgentHeader h3 {
+  color: var(--text);
+  font-size: 18px;
+  margin: 4px 0;
+}
+
+.liveAgentHeader p {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 0;
+}
+
+.liveSignal {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  border-radius: 18px;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+  color: #059669;
+  padding: 7px 11px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.liveSignal i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 12px #22c55e;
+  animation: agentSignal 1.1s ease-in-out infinite;
+}
+
+.liveAgentRail {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.liveAgentNode {
+  position: relative;
+  display: grid;
+  grid-template-columns: 46px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 13px;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  background: rgba(255, 255, 255, 0.76);
+  transition: all 0.35s ease;
+}
+
+.liveAgentLink {
+  position: absolute;
+  top: 52px;
+  left: 32px;
+  height: 18px;
+  width: 2px;
+}
+
+.liveAgentLink span {
+  display: block;
+  height: 100%;
+  background: rgba(100, 116, 139, 0.35);
+}
+
+.liveAgentIcon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--dim);
+  background: #f1f5f9;
+}
+
+.liveAgentCopy small {
+  display: block;
+  font-size: 10px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.liveAgentCopy strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--text);
+  margin: 2px 0;
+}
+
+.liveAgentCopy p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.liveAgentNode-running {
+  border-color: rgba(79, 70, 229, 0.27);
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.055), rgba(8, 145, 178, 0.035));
+  box-shadow: 0 5px 18px rgba(79, 70, 229, 0.07);
+}
+
+.liveAgentNode-running .liveAgentIcon {
+  color: var(--accent-start);
+  background: rgba(79, 70, 229, 0.09);
+  box-shadow: inset 0 0 12px rgba(79, 70, 229, 0.06);
+  animation: agentActiveIcon 1.4s ease-in-out infinite;
+}
+
+.liveAgentNode-running .liveAgentCopy small,
+.liveAgentNode-running .liveAgentCopy p {
+  color: var(--accent-start);
+}
+
+.liveAgentNode-running .liveAgentCopy strong {
+  color: var(--text);
+}
+
+.liveAgentNode-completed {
+  border-color: rgba(52, 211, 153, 0.28);
+  background: rgba(5, 150, 105, 0.09);
+}
+
+.liveAgentNode-completed .liveAgentIcon {
+  color: #059669;
+  background: rgba(16, 185, 129, 0.17);
+}
+
+.liveAgentNode-completed .liveAgentCopy small {
+  color: #059669;
+}
+
+.liveAgentNode-completed .liveAgentCopy strong {
+  color: var(--text);
+}
+
+.liveAgentNode-completed .liveAgentCopy p {
+  color: var(--muted);
+}
+
+.liveAgentNode-failed {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(220, 38, 38, 0.14);
+}
+
+.liveAgentNode-failed .liveAgentIcon,
+.liveAgentNode-failed .liveAgentCopy small {
+  color: #dc2626;
+}
+
+.liveAgentPulse {
+  display: flex;
+  gap: 4px;
+}
+
+.liveAgentPulse b {
+  height: 20px;
+  width: 3px;
+  background: var(--accent-start);
+  border-radius: 3px;
+  animation: agentEqualizer 0.8s ease-in-out infinite;
+}
+
+.liveAgentPulse b:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.liveAgentPulse b:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+.liveAgentFooter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 18px;
+  padding-top: 13px;
+  border-top: 1px solid rgba(100, 116, 139, 0.2);
+  color: var(--accent-start);
+  font-size: 12px;
+}
+
+@keyframes agentGridDrift {
+  from { background-position: 0 0, 0 0, 0 0, 0 0; }
+  to { background-position: 0 0, 0 0, 28px 28px, 28px 28px; }
+}
+
+@keyframes agentGlowFloat {
+  from { transform: translate(0, 0) scale(0.95); }
+  to { transform: translate(-45px, 28px) scale(1.1); }
+}
+
+@keyframes agentScanner {
+  0%, 100% { top: 0; opacity: 0; }
+  10% { opacity: 0.8; }
+  78% { opacity: 0.6; }
+  90% { top: 100%; opacity: 0; }
+}
+
+@keyframes agentOrbTurn {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes agentSignal {
+  0%, 100% { opacity: 0.45; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+@keyframes agentActiveIcon {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+@keyframes agentEqualizer {
+  0%, 100% { transform: scaleY(0.35); opacity: 0.45; }
+  50% { transform: scaleY(1); opacity: 1; }
 }
 
 /* ========================================
@@ -975,13 +1930,51 @@ button:active {
     padding: 12px;
   }
 
-  .composerForm {
-    padding: 4px;
+  .composerPanel {
+    padding: 11px;
+    border-radius: 17px;
   }
 
-  .composerForm textarea {
+  .composerIdentity small {
+    display: none;
+  }
+
+  .composerHeader {
+    gap: 8px;
+  }
+
+  .composerToggle {
+    padding: 7px 9px;
+  }
+
+  .composerModeSwitch {
+    display: flex;
+    width: 100%;
+  }
+
+  .composerModeSwitch button {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 7px;
+  }
+
+  .structuredForm {
+    grid-template-columns: 1fr;
+  }
+
+  .composerField textarea {
     font-size: 14px;
-    padding: 8px 10px;
+    padding: 10px 11px;
+  }
+
+  .composerFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .composerSubmit {
+    justify-content: center;
+    width: 100%;
   }
 
   .topbar {
@@ -1021,6 +2014,15 @@ button:active {
 
   .markdown-body {
     font-size: 13.5px;
+  }
+
+  .searchPhaseRail {
+    grid-template-columns: 1fr;
+  }
+
+  .autoAnalysisPrompt {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Multi-agent patent search and prior-art analysis pipeline.
 
 This module implements the KNN-backed LangGraph orchestration for patent
@@ -149,6 +149,24 @@ def env_bool(name: str, default: bool = False) -> bool:
     return raw.lower() in {"1", "true", "yes", "y", "on"}
 
 
+def knn_embedding_api_base_from_env() -> str:
+    configured = env_text("MULTIAGENT_KNN_EMBED_API_BASE", env_text("LOCAL_API_BASE", "")).rstrip("/")
+    if configured:
+        return configured
+    return "https://api.jina.ai/v1" if env_text("JINA_API_KEY", "") else ""
+
+
+def knn_embedding_api_key_from_env() -> str:
+    return env_text("MULTIAGENT_KNN_EMBED_API_KEY", env_text("JINA_API_KEY", "EMPTY"))
+
+
+def knn_embedding_model_from_env() -> str:
+    configured = env_text("MULTIAGENT_KNN_EMBED_MODEL", env_text("EMBED_SERVED_MODEL", ""))
+    if configured:
+        return configured
+    return "jina-embeddings-v3" if env_text("JINA_API_KEY", "") else "jina-embed-safe"
+
+
 def progress_log(enabled: bool, message: str, **fields: Any) -> None:
     """Print compact notebook-friendly progress messages when requested."""
 
@@ -235,13 +253,13 @@ class PipelineConfig:
     knn_score_agg: str = field(default_factory=lambda: env_text("MULTIAGENT_KNN_SCORE_AGG", "max").lower())
     knn_rrf_k: int = field(default_factory=lambda: env_int("MULTIAGENT_KNN_RRF_K", 60))
     knn_embedding_api_base: str = field(
-        default_factory=lambda: env_text("MULTIAGENT_KNN_EMBED_API_BASE", env_text("LOCAL_API_BASE", "")).rstrip("/")
+        default_factory=knn_embedding_api_base_from_env
     )
     knn_embedding_api_key: str = field(
-        default_factory=lambda: env_text("MULTIAGENT_KNN_EMBED_API_KEY", "EMPTY")
+        default_factory=knn_embedding_api_key_from_env
     )
     knn_embedding_model: str = field(
-        default_factory=lambda: env_text("MULTIAGENT_KNN_EMBED_MODEL", env_text("EMBED_SERVED_MODEL", "jina-embed-safe"))
+        default_factory=knn_embedding_model_from_env
     )
     knn_hf_model: str = field(default_factory=lambda: env_text("MULTIAGENT_KNN_HF_MODEL", "jinaai/jina-embeddings-v3"))
     knn_embedding_task: str = field(default_factory=lambda: env_text("MULTIAGENT_KNN_EMBED_TASK", "retrieval.query"))
@@ -260,8 +278,11 @@ class PatentAnalysisState(TypedDict, total=False):
     pipeline_variant: str
 
     technical_problem: str
+    technical_problem_vi: str
     key_features: List[str]
+    key_features_vi: List[str]
     claim_elements: List[str]
+    claim_elements_vi: List[str]
     query_entities: List[Dict[str, Any]]
     retrieval_focus: Dict[str, Any]
     search_queries: List[Dict[str, Any]]
@@ -1949,10 +1970,13 @@ def embed_knn_query(config: PipelineConfig, text: str) -> List[float]:
             import requests
         except Exception as exc:  # pragma: no cover - optional runtime dependency
             raise RuntimeError("Missing dependency for embedding HTTP call: pip install requests") from exc
+        payload: Dict[str, Any] = {"model": config.knn_embedding_model, "input": [text]}
+        if "api.jina.ai" in config.knn_embedding_api_base.lower():
+            payload["task"] = config.knn_embedding_task
         response = requests.post(
             f"{config.knn_embedding_api_base.rstrip('/')}/embeddings",
             headers={"Authorization": f"Bearer {config.knn_embedding_api_key}"},
-            json={"model": config.knn_embedding_model, "input": [text]},
+            json=payload,
             timeout=120,
         )
         response.raise_for_status()
@@ -2651,7 +2675,13 @@ def sanitize_evidence_output(
     return fallback_evidence
 
 
-def sanitize_analysis_output(parsed: Dict[str, Any], fallback: Dict[str, Any], state: PatentAnalysisState) -> Dict[str, Any]:
+def sanitize_analysis_output(
+    parsed: Dict[str, Any],
+    fallback: Dict[str, Any],
+    state: PatentAnalysisState,
+    config: Optional[PipelineConfig] = None,
+) -> Dict[str, Any]:
+    config = config or PipelineConfig()
     evidence = state.get("evidence", []) or []
     allowed_ids = {normalize_text(item.get("patent_id")) for item in evidence if normalize_text(item.get("patent_id"))}
     evidence_by_id = {
@@ -2753,7 +2783,10 @@ def sanitize_analysis_output(parsed: Dict[str, Any], fallback: Dict[str, Any], s
         ranked.append(analysis_row_from_evidence(doc_id, evidence_item, raw_item))
 
     ranked_doc_ids = {normalize_text(row.get("patent_id")) for row in ranked if normalize_text(row.get("patent_id"))}
-    max_ranked_docs = max(1, min(3, env_int("MULTIAGENT_AGENT3_TOP_DOCS", 3)))
+    max_ranked_docs = max(
+        1,
+        min(config.evidence_top_docs, env_int("MULTIAGENT_AGENT3_TOP_DOCS", config.evidence_top_docs)),
+    )
     for evidence_item in evidence[:max_ranked_docs]:
         if not isinstance(evidence_item, dict):
             continue
@@ -2875,6 +2908,10 @@ def sanitize_analysis_output(parsed: Dict[str, Any], fallback: Dict[str, Any], s
         "ranked_prior_art": ranked or fallback.get("ranked_prior_art", []),
         "coverage": coverage,
         "acceptance_assessment": acceptance,
+        "patent_summaries": parsed.get("patent_summaries"),
+        "novelty": parsed.get("novelty"),
+        "inventive_step": parsed.get("inventive_step"),
+        "industrial_applicability": parsed.get("industrial_applicability"),
     }
     problem_vi = normalize_text(parsed.get("technical_problem_vi"))
     if problem_vi:
@@ -2884,88 +2921,45 @@ def sanitize_analysis_output(parsed: Dict[str, Any], fallback: Dict[str, Any], s
 
 
 def build_prior_art_report(analysis: Dict[str, Any], state: PatentAnalysisState) -> str:
-    """Create a deterministic Vietnamese report from sanitized Agent 3 JSON."""
+    """Create a deterministic Vietnamese report from sanitized Agent 3 JSON using the new structured format."""
 
-    ranked = analysis.get("ranked_prior_art", []) or []
-    coverage = analysis.get("coverage", {}) or {}
-    acceptance = analysis.get("acceptance_assessment", {}) or {}
-    risk_vi = {"high": "cao", "medium": "trung bình", "low": "thấp"}
-    confidence_vi = {"high": "cao", "medium": "trung bình", "low": "thấp"}
-    evidence_by_id = {
-        normalize_text(item.get("patent_id")): item
-        for item in state.get("evidence", []) or []
-        if isinstance(item, dict) and normalize_text(item.get("patent_id"))
-    }
-    likelihood_vi = {
-        "likely": "có khả năng",
-        "uncertain": "chưa chắc chắn",
-        "difficult": "khó",
-    }.get(normalize_text(acceptance.get("acceptance_likelihood")).lower(), normalize_text(acceptance.get("acceptance_likelihood")))
+    patent_summaries = normalize_text(analysis.get("patent_summaries"))
+    novelty = normalize_text(analysis.get("novelty"))
+    inventive_step = normalize_text(analysis.get("inventive_step"))
+    industrial_applicability = normalize_text(analysis.get("industrial_applicability"))
+    
+    technical_problem = normalize_text(analysis.get("technical_problem_vi") or state.get("technical_problem"))
+
     lines = [
         "# Báo cáo phân tích prior art",
         "",
-        f"**Vấn đề kỹ thuật:** {normalize_text(analysis.get('technical_problem_vi') or state.get('technical_problem'))}",
+        f"**Vấn đề kỹ thuật:** {technical_problem}",
         "",
-        "## 1. Tóm tắt kết quả",
-        (
-            f"- Đã đánh giá {len(ranked)} tài liệu prior art mạnh nhất từ danh sách ứng viên đã sàng lọc. "
-            f"Kết luận coverage: {'đủ' if normalize_bool(coverage.get('is_sufficient')) else 'chưa đủ'}; "
-            f"độ tin cậy: {confidence_vi.get(normalize_text(coverage.get('confidence')).lower(), coverage.get('confidence'))}."
-        ),
-        f"- Nhận định khả năng chấp nhận: {likelihood_vi}.",
+        "## 1. Tóm tắt các patent đối chứng",
+        patent_summaries or "Chưa có thông tin tóm tắt.",
         "",
-        "## 2. Các tài liệu mạnh nhất",
+        "## 2. Đánh giá ý tưởng",
+        "### Tính mới của sáng chế (Novelty)",
+        novelty or "Chưa đánh giá.",
+        "",
+        "### Tính không hiển nhiên (Inventive Step)",
+        inventive_step or "Chưa đánh giá.",
+        "",
+        "### Khả năng áp dụng công nghiệp (Industrial Applicability)",
+        industrial_applicability or "Chưa đánh giá.",
     ]
-    if not ranked:
-        lines.append("- Chưa có tài liệu prior art nào được xếp hạng từ bảng bằng chứng.")
-    for row in ranked[:3]:
-        doc_id = normalize_text(row.get("patent_id"))
-        evidence_item = evidence_by_id.get(doc_id, {})
-        matched = row.get("matched_elements") or []
-        matched_vi = row.get("matched_elements_vi") or [technical_label_vi(item) for item in matched]
-        missing = row.get("missing_elements") or []
-        missing_vi = row.get("missing_elements_vi") or [technical_label_vi(item) for item in missing]
-        lines.append(
-            f"- **{row.get('rank')}. {doc_id} - {row.get('title')}**: "
-            f"rủi ro novelty={risk_vi.get(normalize_text(row.get('novelty_risk')).lower(), row.get('novelty_risk'))}; "
-            f"khớp {len(matched_vi)} yếu tố, thiếu {len(missing_vi)} yếu tố. "
-            f"{limit_words(row.get('claim_overlap_summary'), 24)}"
-        )
-        limitation = normalize_text(row.get("limitations"))
-        if limitation:
-            lines.append(f"  - Giới hạn chính: {limit_words(limitation, 34)}")
-        for match in (evidence_item.get("matched_elements") or [])[:2]:
-            if isinstance(match, dict):
-                claim_label = match.get("claim_element_vi") or technical_label_vi(match.get("claim_element"))
-                lines.append(
-                    f"  - Bằng chứng (trích dẫn nguồn): {limit_words(claim_label, 16)} -> "
-                    f"{limit_words(match.get('evidence_text'), 24)} "
-                    f"({match.get('match_type_vi') or match_type_vi(match.get('match_type'))}; "
-                    f"điểm thiếu: {limit_words(match.get('gap_or_limitation'), 18)})"
-                )
-        if missing_vi:
-            lines.append("  - Yếu tố còn thiếu: " + "; ".join(limit_words(item, 14) for item in missing_vi[:3]))
-
-    lines.extend(
-        [
-            "",
-            "## 3. Độ bao phủ bằng chứng",
-            f"- Đủ bằng chứng: {'có' if normalize_bool(coverage.get('is_sufficient')) else 'không'}; "
-            f"độ tin cậy: {confidence_vi.get(normalize_text(coverage.get('confidence')).lower(), coverage.get('confidence'))}.",
-            f"- Ghi chú: {limit_words(coverage.get('coverage_notes'), 44)}",
-            "",
-            "## 4. Đánh giá khả năng chấp nhận",
-            f"- Khả năng chấp nhận: {likelihood_vi}.",
-            f"- Lý do: {limit_words(acceptance.get('why'), 58)}",
-            f"- Chiến lược đề xuất: {limit_words(acceptance.get('recommended_strategy'), 64)}",
-        ]
-    )
-    obstacles = normalize_list(acceptance.get("main_obstacles"))[:3]
-    if obstacles:
-        lines.append("- Trở ngại chính: " + "; ".join(obstacles))
-    directions = normalize_list(acceptance.get("amendment_directions"))[:3]
-    if directions:
-        lines.append("- Hướng sửa yêu cầu bảo hộ: " + "; ".join(directions))
+    
+    ranked = analysis.get("ranked_prior_art", []) or []
+    if ranked:
+        lines.extend(["", "## 3. Chi tiết các tài liệu đối chứng mạnh nhất"])
+        risk_vi = {"high": "cao", "medium": "trung bình", "low": "thấp"}
+        for row in ranked[:5]:
+            doc_id = normalize_text(row.get("patent_id"))
+            lines.append(
+                f"- **{row.get('rank')}. {doc_id} - {row.get('title')}**: "
+                f"rủi ro novelty={risk_vi.get(normalize_text(row.get('novelty_risk')).lower(), row.get('novelty_risk'))}. "
+                f"{limit_words(row.get('claim_overlap_summary'), 24)}"
+            )
     return "\n".join(lines)
 
 
@@ -3193,8 +3187,11 @@ def query_understanding_response_schema() -> Dict[str, Any]:
         "properties": {
             "input_type": {"type": "string", "enum": ["patent_document", "idea", "unknown"]},
             "technical_problem": {"type": "string"},
+            "technical_problem_vi": {"type": "string"},
             "key_features": string_array,
+            "key_features_vi": string_array,
             "claim_elements": string_array,
+            "claim_elements_vi": string_array,
             "query_entities": {
                 "type": "array",
                 "items": {
@@ -3266,8 +3263,11 @@ def query_understanding_response_schema() -> Dict[str, Any]:
         },
         "required": [
             "technical_problem",
+            "technical_problem_vi",
             "key_features",
+            "key_features_vi",
             "claim_elements",
+            "claim_elements_vi",
             "search_queries",
         ],
         "additionalProperties": False,
@@ -3362,13 +3362,16 @@ Metadata JSON:
 
 {schema_instruction}
 Return compact JSON only, using this top-level key order:
-technical_problem, claim_elements, key_features, search_queries.
+technical_problem, technical_problem_vi, claim_elements, claim_elements_vi, key_features, key_features_vi, search_queries.
 Use minified JSON: no pretty-printing and no whitespace outside string values.
 
 Field contract:
 - technical_problem: one prior-art retrieval problem, max 22 words.
+- technical_problem_vi: faithful Vietnamese translation of technical_problem for UI display.
 - claim_elements: exactly 3 comparable elements, max 16 words each.
+- claim_elements_vi: exactly 3 Vietnamese translations aligned with claim_elements.
 - key_features: exactly 3 components/functions, max 12 words each.
+- key_features_vi: exactly 3 Vietnamese translations aligned with key_features.
 - search_queries: exactly 4 objects covering combined, claims, technical_problem, and feature.
 
 Search query item contract:
@@ -3383,6 +3386,7 @@ Rules:
 - Feature queries must combine a component with its function; avoid material-only queries.
 - Do not invent IPC, citations, patents, dates, inventors, assignees, or prior-art facts.
 - Do not choose another retrieval backend.
+- Keep retrieval fields and search query text in the most effective technical search language; use only *_vi fields for Vietnamese UI display.
 - Do not output input_type, filters, query_entities, or retrieval_focus; runtime code derives them.
 """
 
@@ -3398,8 +3402,11 @@ Rules:
     )
     agent1_expected_keys = [
         "technical_problem",
+        "technical_problem_vi",
         "key_features",
+        "key_features_vi",
         "claim_elements",
+        "claim_elements_vi",
         "search_queries",
     ]
     parsed = call_llm_json(
@@ -3444,8 +3451,11 @@ Rules:
     update = {
         "input_type": normalize_text(parsed.get("input_type")) or fallback["input_type"],
         "technical_problem": normalize_text(parsed.get("technical_problem")) or fallback["technical_problem"],
+        "technical_problem_vi": normalize_text(parsed.get("technical_problem_vi")),
         "key_features": normalize_list(parsed.get("key_features")) or fallback["key_features"],
+        "key_features_vi": normalize_list(parsed.get("key_features_vi")),
         "claim_elements": normalize_list(parsed.get("claim_elements")) or fallback["claim_elements"],
+        "claim_elements_vi": normalize_list(parsed.get("claim_elements_vi")),
         "query_entities": query_entities,
         "retrieval_focus": retrieval_focus,
         "search_queries": search_queries,
@@ -3742,7 +3752,10 @@ def evidence_extraction_agent(
     config = config or PipelineConfig()
     llm_config = config_for_agent_llm(config, 2)
     fallback = {"candidate_evidence": heuristic_extract_evidence(state, config)}
-    agent2_top_docs = max(1, min(config.evidence_top_docs, env_int("MULTIAGENT_AGENT2_TOP_DOCS", 3)))
+    agent2_top_docs = max(
+        1,
+        min(config.evidence_top_docs, env_int("MULTIAGENT_AGENT2_TOP_DOCS", config.evidence_top_docs)),
+    )
     agent2_text_words = max(60, env_int("MULTIAGENT_AGENT2_CANDIDATE_TEXT_WORDS", 130))
     agent2_claim_elements = max(1, env_int("MULTIAGENT_AGENT2_CLAIM_ELEMENTS", 3))
     claim_elements = [limit_words(item, 24) for item in normalize_list(state.get("claim_elements"))[:agent2_claim_elements]]
@@ -3987,7 +4000,10 @@ def prior_art_analysis_agent(
     config = config or PipelineConfig()
     llm_config = config_for_agent_llm(config, 3)
     fallback = heuristic_prior_art_analysis(state)
-    agent3_top_docs = max(1, min(config.evidence_top_docs, env_int("MULTIAGENT_AGENT3_TOP_DOCS", 3)))
+    agent3_top_docs = max(
+        1,
+        min(config.evidence_top_docs, env_int("MULTIAGENT_AGENT3_TOP_DOCS", config.evidence_top_docs)),
+    )
     query_understanding_prompt = {
         "technical_problem": limit_words(state.get("technical_problem", ""), 32),
         "key_features": [limit_words(item, 16) for item in normalize_list(state.get("key_features"))[:3]],
@@ -4010,10 +4026,10 @@ Query:
 {dump_json_for_prompt(query_understanding_prompt, env_int("MULTIAGENT_AGENT3_QUERY_JSON_CHARS", 1200))}
 
 Candidates:
-{dump_json_for_prompt(screened_prompt, env_int("MULTIAGENT_AGENT3_CANDIDATES_JSON_CHARS", 1200))}
+{dump_json_for_prompt(screened_prompt, env_int("MULTIAGENT_AGENT3_CANDIDATES_JSON_CHARS", 2000))}
 
 Evidence:
-{dump_json_for_prompt(evidence_prompt, env_int("MULTIAGENT_AGENT3_EVIDENCE_JSON_CHARS", 2600))}
+{dump_json_for_prompt(evidence_prompt, env_int("MULTIAGENT_AGENT3_EVIDENCE_JSON_CHARS", 4400))}
 
 Return minified JSON only:
 {{
@@ -4043,14 +4059,18 @@ Return minified JSON only:
     "why": "lý do bằng tiếng Việt",
     "recommended_strategy": "chiến lược bằng tiếng Việt",
     "amendment_directions": ["hướng sửa bằng tiếng Việt"]
-  }}
+  }},
+  "patent_summaries": "tóm tắt bằng tiếng Việt",
+  "novelty": "đánh giá tính mới bằng tiếng Việt",
+  "inventive_step": "đánh giá tính không hiển nhiên bằng tiếng Việt",
+  "industrial_applicability": "đánh giá khả năng áp dụng công nghiệp bằng tiếng Việt"
 }}
 
 Rules:
 - Do not add patents not present in evidence.
 - Do not invent assignee, date, claim text, or retrieval evidence.
 - Acceptance assessment is a technical/prosecution-risk estimate, not legal advice.
-- Return one ranked_prior_art row for each evidence document, up to 3 documents, even when novelty risk is low.
+- Return one ranked_prior_art row for each evidence document, up to 5 documents, even when novelty risk is low.
 - Keep every string short.
 - Write all explanatory strings in Vietnamese with accents.
 - Keep patent IDs, titles, and evidence quotes in their source language.
@@ -4059,6 +4079,8 @@ Rules:
 - If the strongest candidates miss a central claim element, treat that missing element as a distinction.
 - If evidence is weak or only partial, set is_sufficient=false.
 - Do not output final_report_markdown; runtime code writes the markdown report.
+- CRITICAL CONSISTENCY: The overall 'novelty' assessment MUST be logically consistent with the 'novelty_risk' of individual patents. If ANY patent has a 'high' novelty_risk (meaning it discloses all elements), you MUST conclude that the idea lacks novelty (không có tính mới). If the idea lacks novelty, it automatically lacks inventive_step.
+- MINDSET & TONE: You are a strict, highly critical Patent Examiner. Adopt a skeptical approach. Default to finding reasons to reject novelty and inventive step based on prior art. Only give a positive assessment if the prior art completely fails to disclose the core elements.
 """
 
     parsed = call_llm_json(
@@ -4069,7 +4091,7 @@ Rules:
         expected_keys=["ranked_prior_art", "coverage", "acceptance_assessment"],
     )
     used_fallback = parsed is fallback
-    analysis = sanitize_analysis_output(parsed, fallback, state)
+    analysis = sanitize_analysis_output(parsed, fallback, state, config)
     coverage = analysis["coverage"]
     final_report = analysis["final_report_markdown"]
     audit = add_audit(

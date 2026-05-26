@@ -3,9 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.core.config import settings
-from app.db.session import Base, engine
+from app.db.session import Base, engine, ensure_analysis_record_columns
 
 Base.metadata.create_all(bind=engine)
+ensure_analysis_record_columns()
 
 app = FastAPI(title="Research Analysis API", version="0.1.0")
 

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -22,18 +23,41 @@ class SearchCandidate(BaseModel):
     priority_date: str = ""
     score: float
 
+
+class AgentStep(BaseModel):
+    agent: str
+    label: str
+    status: str = "completed"
+    summary: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentTrace(BaseModel):
+    variant: str
+    steps: list[AgentStep] = Field(default_factory=list)
+    metrics: dict[str, Any] = Field(default_factory=dict)
+
+
 class SearchResponse(BaseModel):
     candidates: list[SearchCandidate]
+    agent_trace: AgentTrace | None = None
 
 class AnalyzeSelectedRequest(BaseModel):
     query: str = Field(min_length=2, max_length=5000)
     selected_candidates: list[SearchCandidate]
+
+
+class AnalysisRunResponse(BaseModel):
+    run_id: str
+    status: str = "queued"
+
 
 class AnalysisResult(BaseModel):
     summary: str
     key_points: list[str]
     analysis: str
     suggestions: list[str]
+    agent_trace: AgentTrace | None = None
 
 
 class AnalysisResponse(AnalysisResult):
