@@ -5,5 +5,15 @@ psycopg[binary]==3.2.3
 pydantic-settings==2.7.1
 openai>=1.50.0
 google-genai>=1.0.0
-elasticsearch==9.4.0
+elasticsearch>=8.0.0,<10.0.0
 httpx==0.28.1
+langgraph>=0.6,<1.0; python_version < "3.10"
+langgraph>=1.0; python_version >= "3.10"
+requests>=2.31.0
+numpy>=1.24.0
+transformers==4.45.2
+torch>=2.0.0
+accelerate>=1.6.0
+einops>=0.7.0
+peft>=0.13.0
+safetensors>=0.4.5

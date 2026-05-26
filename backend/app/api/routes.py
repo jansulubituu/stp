@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.analysis import AnalysisRecord
 from app.schemas.analysis import AnalysisResponse, AnalyzeRequest, SearchResponse, AnalyzeSelectedRequest
-from app.services.analyzer import analyzer_service
+from app.services.multiagent_adapter import multiagent_service as analyzer_service
 
 router = APIRouter()
 

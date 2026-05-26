@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Custom API route handler cho /api/analyze.
- * Bypass Next.js rewrite proxy để kiểm soát timeout tối đa 120 giây.
+ * Bypass Next.js rewrite proxy để kiểm soát timeout tối đa 300 giây.
  * Giải quyết triệt để lỗi ECONNRESET do proxy mặc định timeout quá ngắn.
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // AbortController với timeout 120 giây
+    // AbortController với timeout 300 giây
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120_000);
+    const timeoutId = setTimeout(() => controller.abort(), 300_000);
 
     const backendRes = await fetch("http://localhost:8000/api/analyze", {
       method: "POST",
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     if (message.includes("aborted")) {
       return NextResponse.json(
-        { detail: "Backend xử lý quá lâu (>120 giây). Vui lòng thử lại với truy vấn ngắn hơn." },
+        { detail: "Backend xử lý quá lâu (>300 giây). Vui lòng thử lại với truy vấn ngắn hơn." },
         { status: 504 }
       );
     }

@@ -1,0 +1,24 @@
+<mxfile host="app.diagrams.net" modified="2026-04-15T00:00:00.000Z" agent="GPT-5.4 Thinking" version="24.7.17">
+  <diagram id="diagram-1" name="Askari 2024 Pipeline">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="Askari et al., 2024 — RPRS for Extremely Long Queries and Documents" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=24;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="180" y="40" width="1240" height="60" as="geometry"/></mxCell><mxCell id="3" value="Đầu vào:
+Long query +
+Top-k candidate docs" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;align=center;verticalAlign=middle;" parent="1" vertex="1"><mxGeometry x="60" y="180" width="250" height="120" as="geometry"/></mxCell><mxCell id="4" value="Tách query và
+document thành
+các câu" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;align=center;verticalAlign=middle;" parent="1" vertex="1"><mxGeometry x="350" y="180" width="250" height="120" as="geometry"/></mxCell><mxCell id="5" value="Embedding
+cho từng câu" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;align=center;verticalAlign=middle;" parent="1" vertex="1"><mxGeometry x="640" y="180" width="250" height="120" as="geometry"/></mxCell><mxCell id="6" value="RPRS scoring:
+đo mức bao phủ
+query ↔ document" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;align=center;verticalAlign=middle;" parent="1" vertex="1"><mxGeometry x="930" y="180" width="250" height="120" as="geometry"/></mxCell><mxCell id="7" value="Đầu ra:
+Danh sách candidate
+được rerank" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;align=center;verticalAlign=middle;" parent="1" vertex="1"><mxGeometry x="1220" y="180" width="250" height="120" as="geometry"/></mxCell><mxCell id="8" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" parent="1" edge="1" source="3" target="4"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="9" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" parent="1" edge="1" source="4" target="5"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="10" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" parent="1" edge="1" source="5" target="6"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="11" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" parent="1" edge="1" source="6" target="7"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="12" value="Input: query rất dài và tập top-k tài liệu ứng viên lấy từ một bộ retrieval ban đầu.
+
+Output: thứ hạng mới của các ứng viên dựa trên Proportional Relevance Score.
+
+Ý chính: bài báo xử lý tốt tài liệu/query cực dài bằng cách làm việc ở mức câu thay vì cắt ngắn theo cửa sổ token." style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;align=left;spacingLeft=12;verticalAlign=middle;" parent="1" vertex="1"><mxGeometry x="100" y="380" width="1360" height="170" as="geometry"/></mxCell><mxCell id="13" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=none;strokeColor=#666666;strokeWidth=2;" parent="1" vertex="1"><mxGeometry x="30" y="20" width="1520" height="600" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -639,7 +639,7 @@ export default function Home() {
             <article className="message assistantMessage">
               <div className="avatar"><Bot size={16} /></div>
               <div className="thinkingContainer">
-                <span className="thinkingText">NVIDIA NIM đang đọc kỹ {selectedDocs.length} tài liệu và sinh báo cáo...</span>
+                <span className="thinkingText">Multi-agent AI đang đọc kỹ {selectedDocs.length} tài liệu và sinh báo cáo...</span>
                 <div className="dotGroup"><div className="dot" /><div className="dot" /><div className="dot" /></div>
               </div>
             </article>

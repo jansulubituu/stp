@@ -1,72 +1,74 @@
+import logging
 import os
 import sys
-import logging
-from dotenv import load_dotenv
 
-# Thiết lập hiển thị Log Console để debug chi tiết
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except Exception:
+    pass
+
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
-# Nạp biến môi trường từ .env trước khi import backend core
-load_dotenv()
-
-# Thêm thư mục hiện tại vào PYTHONPATH
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-def run_e2e_test():
-    print("\n" + "="*60)
-    print("--- STARTING END-TO-END PIPELINE TEST ---")
-    print("="*60 + "\n")
+
+def run_e2e_test() -> bool:
+    print("\n" + "=" * 60)
+    print("--- STARTING MULTI-AGENT E2E PIPELINE TEST ---")
+    print("=" * 60 + "\n")
 
     try:
-        print("[STEP 0] Initializing Analyzer Service...")
-        from app.services.analyzer import analyzer_service
-        print("SUCCESS: Analyzer Imported!\n")
-        
+        print("[STEP 0] Initializing multi-agent service...")
+        from app.services.multiagent_adapter import multiagent_service
+
+        runtime_check = multiagent_service.validate_runtime()
+        print("Runtime ok:", runtime_check.get("ok"))
+        if runtime_check.get("issues"):
+            print("Runtime issues:")
+            for issue in runtime_check["issues"]:
+                print(" -", issue)
+            print()
+
         test_query = (
             "A method and device for wireless power transmission and receiving. "
             "The system includes an inductive coupling coil and a smart safety controller "
             "that adjusts frequency and current dynamically using machine learning algorithms "
             "to optimize charging efficiency for electric vehicles."
         )
-        
-        print(f"[STEP 1] Test input prepared:")
-        print(f"Query snippet: '{test_query[:100]}...'\n")
-        
-        print("[STEP 2] Executing Full Pipeline (Profiler -> ES Cloud -> Graph -> Nvidia NIM)...")
-        result = analyzer_service.analyze(test_query)
-        
-        print("\n" + "-"*40)
+
+        print("[STEP 1] Executing full PB4 multi-agent pipeline...")
+        result = multiagent_service.analyze(test_query)
+
+        print("\n" + "-" * 40)
         print("--- RESULTS ---")
-        print("-"*40)
-        
+        print("-" * 40)
         print(f"Summary: {result.summary}")
         print(f"Key Points: {result.key_points}")
         print(f"Suggestions: {result.suggestions}")
-        
-        print("\nMarkdown Analysis Output Sample (first 400 chars):")
-        print("="*50)
-        # Encode safely just in case LLM returned UTF-8 that the terminal hates
-        safe_print = result.analysis.encode('ascii', 'replace').decode('ascii')
-        print(safe_print[:400] + "...")
-        print("="*50)
-        
-        # Verify
-        if "error" in result.summary.lower() or "failed" in result.summary.lower():
-            print("\nFAIL: The pipeline encountered an error.")
+        print("\nMarkdown Analysis Output Sample:")
+        print("=" * 50)
+        print(result.analysis[:600] + "...")
+        print("=" * 50)
+
+        if "failed" in result.summary.lower() or "error" in result.analysis.lower():
+            print("\nFAIL: The multi-agent pipeline returned an error result.")
             return False
-        else:
-            print("\nSUCCESS: The pipeline ran flawlessly end-to-end!")
-            return True
 
-
-    except Exception as e:
-        print(f"\n💥 LỖI NGHIÊM TRỌNG XẢY RA TRONG QUÁ TRÌNH CHẠY:")
+        print("\nSUCCESS: The multi-agent pipeline ran end-to-end.")
+        return True
+    except Exception:
+        print("\nFATAL: Unhandled exception while running the multi-agent pipeline.")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 if __name__ == "__main__":
     success = run_e2e_test()

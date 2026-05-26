@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     groq_model: str = "llama-3.1-8b-instant"
     translate_titles: bool = True
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @field_validator("cors_origins", mode="before")
     @classmethod

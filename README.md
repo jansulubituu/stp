@@ -7,7 +7,7 @@
 - Frontend: Next.js + React + TypeScript
 - Backend: FastAPI + SQLAlchemy
 - Database: SQLite khi chạy cục bộ, hoặc PostgreSQL qua `DATABASE_URL`
-- AI/Search: NVIDIA NIM, Elasticsearch, Jina và Gemini được cấu hình trong `backend/.env`
+- AI/Search: Multi-agent prior-art pipeline, Groq/OpenAI-compatible LLM, Elasticsearch KNN, optional Jina embedding service
 
 ## Cấu trúc
 
@@ -184,6 +184,29 @@ ES_API_KEY=
 JINA_API_KEY=
 GEMINI_API_KEY=
 ```
+
+Pipeline backend hien tai dung service multi-agent trong `backend/pipeline-ma`. De chay luong moi, uu tien cau hinh cac bien sau trong `backend/.env`:
+
+```dotenv
+GROQ_API_KEY=
+MULTIAGENT_LLM_PROVIDER=groq
+MULTIAGENT_LLM_MODEL=openai/gpt-oss-120b
+MULTIAGENT_AGENT2_LLM_MODEL=openai/gpt-oss-120b
+MULTIAGENT_AGENT3_LLM_MODEL=openai/gpt-oss-120b
+
+ES_CLOUD_ID=
+ES_API_KEY=
+BM25_INDEX=clef_ip_patents_v1_mini
+KNN_INDEX=clef_ip_patents_v1_mini_jina
+ES_VECTOR_FIELD=content_vector
+
+MULTIAGENT_RETRIEVAL_BACKEND=es_knn
+MULTIAGENT_KNN_EMBED_API_BASE=
+MULTIAGENT_KNN_EMBED_API_KEY=EMPTY
+MULTIAGENT_KNN_EMBED_MODEL=jina-embed-safe
+```
+
+Neu khong set `MULTIAGENT_KNN_EMBED_API_BASE`, pipeline se thu load local `jinaai/jina-embeddings-v3`, can them cac dependency GPU/Transformers nang hon.
 
 Không commit file `.env` có chứa API key.
 
